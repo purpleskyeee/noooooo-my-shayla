@@ -1,189 +1,123 @@
-# RW-Template
+# Autonomous Movement Reference
 
-Badges below (Downloads and Stars) update automatically every 5-15 minutes
+This document shows how to call movement functions implemented in `src/motor-control.cpp` and how to combine them inside `src/auton_task.cpp` routines.
 
-[<img src="https://img.shields.io/github/downloads/richardbwang/RW-Template/total?style=for-the-badge">](https://github.com/richardbwang/RW-Template/releases)
+## Movement Primitives
 
-[<img src="https://img.shields.io/github/stars/richardbwang/RW-Template?style=for-the-badge">](https://github.com/richardbwang/RW-Template/stargazers)
+Each section below summarizes what the helper does, how to pick its inputs, and gives an example call that matches the current implementation in `src/motor-control.cpp`.
 
-## 📦 Project Description
+### `turnToAngle`
+- **Signature:** `turnToAngle(double angleDeg, double timeLimitMs, bool exit, double maxVolt, double exitVelocity = 0)`
+- **Concept:** PID turn to an absolute inertial heading.
+- **Inputs:**
+  - `angleDeg`: Absolute goal heading (robot auto-normalizes around current heading).
+  - `timeLimitMs`: Safety timeout for the turn loop.
+  - `exit`: `true` applies hold or stop at the end; `false` keeps motors spinning for chaining.
+  - `maxVolt`: Voltage cap (0–12 V).
+  - `exitVelocity`: Optional spin voltage to leave applied when `exit` is true.
+- **Example:**
+  ```cpp
+  turnToAngle(135, 1200, true, 10); // turn to 135° and hold
+  ```
 
-Welcome to RW-Template! This project is an advanced **VEX V5 autonomous robotics template** focused on precise, algorithm-driven motion planning and control. It is designed for teams who want robust, adaptable autonomous routines with support for a wide range of sensor and drive configurations.
+### `driveTo`
+- **Signature:** `driveTo(double distanceIn, double timeLimitMs, bool exit, double maxVolt, double exitVelocity = 0, bool enforceHeading = true)`
+- **Concept:** Linear PID that drives a set distance while correcting heading.
+- **Inputs:**
+  - `distanceIn`: Inches to travel (positive forward, negative backward).
+  - `timeLimitMs`: Timeout for the move.
+  - `exit`: `false` for chaining (stays in coast/drive), `true` to stop/hold.
+  - `maxVolt`: Voltage cap.
+  - `exitVelocity`: Optional constant drive voltage on exit.
+  - `enforceHeading`: Leave `true` to maintain `correct_angle`; set `false` if you purposely want to bias heading.
+- **Example:**
+  ```cpp
+  driveTo(48, 2000, true, 11); // drive forward 4 ft and hold
+  ```
 
----
+### `curveCircle`
+- **Signature:** `curveCircle(double resultAngleDeg, double centerRadiusIn, double timeLimitMs, bool exit, double maxVolt)`
+- **Concept:** Maintains a fixed turning radius by coordinating inner/outer wheel distances while PID tracking heading along the arc.
+- **Inputs:**
+  - `resultAngleDeg`: Absolute heading when the arc finishes.
+  - `centerRadiusIn`: Radius from robot center to circle center (positive = curve right, negative = curve left). Use values greater than half the track width.
+  - `timeLimitMs`, `exit`, `maxVolt`: Same semantics as other moves.
+- **Example:**
+  ```cpp
+  curveCircle(0, 20, 1800, true, 9); // 20" right arc back to heading 0°
+  ```
 
-## 🚀 Features
+### `swing`
+- **Signature:** `swing(double targetAngleDeg, double driveDir, double timeLimitMs, bool exit, double maxVolt)`
+- **Concept:** Spins only one side of the drivetrain so the robot pivots around the other side.
+- **Inputs:**
+  - `targetAngleDeg`: Absolute heading goal.
+  - `driveDir`: `1` for forward-side swing, `-1` for reverse-side swing.
+  - `timeLimitMs`, `exit`, `maxVolt`: Standard behavior.
+- **Example:**
+  ```cpp
+  swing(90, 1, 900, true, 8); // swing forward side to face 90°
+  ```
 
-### ✅ Universal PID Class
-- Modular, reusable PID controller for all motion and heading tasks.
+### `moveToPoint`
+- **Signature:** `moveToPoint(double x, double y, int dir, double timeLimitMs, bool exit, double maxVolt, bool overturn = false)`
+- **Concept:** Chases a target coordinate by continuously updating both distance and heading targets.
+- **Inputs:**
+  - `x`, `y`: Target world coordinates (inches) relative to `x_pos`/`y_pos`.
+  - `dir`: `1` to face and drive forward, `-1` to drive backwards while facing the point.
+  - `timeLimitMs`, `exit`, `maxVolt`: Same semantics as other moves.
+  - `overturn`: Allow heading correction to clamp drive side for sharp turns.
+- **Example:**
+  ```cpp
+  moveToPoint(36, 60, 1, 2500, true, 10); // forward to (36,60)
+  ```
 
-### 📍 Odometry
-- Tracks robot position using drivetrain encoders and/or tracking wheels for accurate field navigation.
+### `boomerang`
+- **Signature:** `boomerang(double x, double y, int dir, double finalAngleDeg, double dlead, double timeLimitMs, bool exit, double maxVolt, bool overturn)`
+- **Concept:** “Carrot chase” controller—creates a lookahead carrot to blend distance + heading smoothly, finishing at `finalAngleDeg`.
+- **Inputs:**
+  - `x`, `y`, `dir`, `timeLimitMs`, `exit`, `maxVolt`, `overturn`: Same meaning as `moveToPoint`.
+  - `finalAngleDeg`: Desired heading when reaching `(x,y)`.
+  - `dlead`: Lookahead multiplier (0–0.6). Higher = smoother but wider path.
+- **Example:**
+  ```cpp
+  boomerang(24, 72, 1, 135, 0.35, 3200, true, 10, true);
+  ```
 
-### 🧭 IMU Support
-- Integrates inertial sensor (IMU) for heading correction and absolute orientation.
+### `correctHeadingFromSensors`
+- **Signature:** `correctHeadingFromSensors(int samples, double maxApplyShift, double alignTimeMs, double alignMaxVolt, double desiredHeadingDeg = NAN)`
+- **Concept:** Samples the configured front/right distance sensors, snaps odometry (`x_pos`, `y_pos`, `correct_angle`) to the reference walls, then optionally re-aligns heading.
+- **Inputs:**
+  - `samples`: Number of readings to average per sensor.
+  - `maxApplyShift`: Rejects pose corrections exceeding this distance; pass a negative value to use `max_pose_correction_shift_in` from `definitions.cpp`.
+  - `alignTimeMs`, `alignMaxVolt`: Limits for the follow-up heading alignment.
+  - `desiredHeadingDeg`: If `NAN`, align to `correct_angle`; otherwise align to the specified heading.
+- **Example:**
+  ```cpp
+  bool ok = correctHeadingFromSensors(8, -1.0, 900, 8, 90);
+  ```
 
-### 🔁 Tracking Wheel Flexibility
-- Works with or without tracking wheels.
-- Supports all tracking wheel configurations.
-- Fall-back support using only drivetrain encoders and IMU for basic pose estimation.
+## Complete Examples
 
-### 🎯 Turn to Face Point/Heading
-- Algorithms to turn the robot to face any field point or specific heading.
+```cpp
+void rushStack() {
+  driveTo(48, 1800, false, 12);        // keep rolling
+  driveTo(12, 800, true, 8);           // final brake
+  turnToAngle(0, 1000, true, 8);       // snapshot heading
+}
 
-### 🔄 Swing to Face Heading
-- Swing turn routines for efficient, single-side turning to a point or heading.
+void alignAgainstWall() {
+  if (correctHeadingFromSensors(10, 2.5, 800, 8, 90)) {
+    driveTo(6, 600, true, 6);
+  }
+}
 
-### 🏹 Move to Point
-- Navigate to a specific coordinate using position and heading correction.
-- Works consistently with or without tracking wheels.
+void collectCornerRing() {
+  task passiveIntake([] { while (true) runIntake(8); });
+  boomerang(36, 60, 1, 135, 0.4, 3000, true, 10, true);
+  passiveIntake.stop();
+  holdIntake();
+}
+```
 
-### 📐 Curve Path Movement (`curveCircle`)
-- Executes smooth, circular/curved paths to a target point.
-- Fully compatible with robots **not using tracking wheels or full odometry**.
-- Uses heading + distance PID control to maintain curvature.
-
-### 🏹 Move to Pose via Boomerang
-- Advanced “boomerang” algorithm for smooth, curved motion to a target pose (position + heading).
-
-### ⛓️ Motion Chaining
-- Seamlessly links multiple motion commands for fluid, uninterrupted autonomous routines.
-
-### 💡 Easy Updates
-- Legacy `custom/` assets are preserved, but day-to-day edits now happen directly in `src/`/`include/`  
-- future updates to core code are seamless
-- copy/paste portability across projects or seasons  
-
----
-
-## 🛠️ Installation/Update Guide
-
-Follow these steps to set up the project on your local machine:
-
-1. **Download and install Visual Studio Code (VS Code)**
-   - [https://code.visualstudio.com/](https://code.visualstudio.com/)
-
-2. **Install the VEX Robotics Extension in VS Code**
-   - Open the Extensions view (`Ctrl/Cmd+Shift+X`)
-   - Search for and install **"VEX Robotics Extension"** by VEX Robotics
-
-3. **Set up the project folder**
-   - Download the latest version's ZIP file titled **`RW-Template.zip`** (not the source code files) from the [Releases](https://github.com/richardbwang/RW-Template/releases) section below
-   - Unzip the downloaded file
-   - Open the resulting folder with Visual Studio Code
-   - If you are updating from an older release, copy your edited files (for example `src/auton_task.cpp`, `src/auton_functions.cpp`, `src/definitions.cpp`, and `include/definitions.h`) into the new project
-
----
-
-## 📘 Usage Guide
-
-**Note: User-editable code now lives directly inside `src/` and `include/`, so keep backups of the files you customize when upgrading.**
-
-### 1. Project Structure
-
-Your project is organized into the following folders and files:
-
-**custom/include/**
-- (migrated) User-editable headers now live directly under `include/`
-
-**custom/src/**
-- (migrated) User-editable source now lives under `src/`
-
-**include/**
-- `auton_functions.h` — Intake/indexer helpers used during autonomous
-- `auton_task.h` — Entry points for autonomous and driver periods
-- `definitions.h` — Shared device declarations and driver-control state
-- `port_config.h` — Centralized mapping of hardware ports
-- `motor-control.h` — Core drive and motion control function declarations  
-- `pid.h` — Reusable PID controller class declaration  
-- `utils.h` — Math and geometry utility functions  
-- `vex.h` — Standard VEX libraries and device setup
-
-**src/**
-- `auton_functions.cpp` — Implementations of intake/indexer helpers
-- `auton_task.cpp` — Autonomous/driver/pre-auton logic
-- `main.cpp` — Competition entry point and control flow  
-- `definitions.cpp` — Hardware instantiation and configurable constants
-- `motor-control.cpp` — Core drive and motion control function implementations  
-- `pid.cpp` — PID controller logic  
-- `utils.cpp` — Math and geometry utility function implementations
-
-### 2. Robot Configuration
-
-Edit `src/definitions.cpp` and `include/definitions.h` to match your robot’s hardware.
-
-- Set the correct ports for motors, sensors, and other robot devices
-- Group drive motors into `left_chassis` and `right_chassis` motor groups
-
-### 3. Tuning Your Robot
-
-In `src/definitions.cpp`, locate the section labeled **USER-CONFIGURABLE PARAMETERS** and adjust the following:
-
-- `distance_between_wheels`: Distance between the left and right wheels (in inches)  
-- `wheel_distance_in`: Wheel circumference (see comments in code for help)  
-- PID constants: `distance_kp`, `distance_ki`, `distance_kd`, etc.
-
-If using a horizontal and/or vertical tracking wheel:
-
-- Set `using_horizontal_tracker = true` and/or `using_vertical_tracker = true`
-- Configure tracker distances and diameters accordingly
-
-### 4. Autonomous Programming
-
-Edit `src/auton_task.cpp` to define your autonomous routines.
-
-You can use the motion functions from `motor-control.h`:
-
-- `driveTo(distance, time_limit, exit, max_output)`  
-- `turnToAngle(angle, time_limit, exit, max_output)`  
-- `moveToPoint(x, y, dir, time_limit, exit, max_output, overturn)`  
-- `boomerang(x, y, dir, angle, dlead, time_limit, exit, max_output, overturn)`
-
-Select the routine to run inside the `AutonSkills()` function in `src/auton_task.cpp`.
-
-### 5. Driver Control
-
-Edit the `DriverControl()` function in `src/auton_task.cpp`.
-
-By default, it uses tank drive:
-
-`driveChassis(ch3 * 0.12, ch2 * 0.12);`
-
-You can customize this for:
-
-- Arcade drive  
-- Split arcade  
-- Adding button controls for mechanisms
-
-### 6. Competition Setup
-
-This template follows the VEX Competition structure:
-
-- `pre_auton()` which calls `PreAuton()` runs once at startup (ideal for sensor calibration)  
-- `autonomous()` which calls `AutonSkills()` runs during the autonomous period  
-- `usercontrol()` which calls `runDriver()` runs during the driver control period  
-- The `main()` function connects all of these automatically
-
-### 7. Tips for Success
-
-- Read comments in each file — they clarify how each function and variable works  
-- Tune PID values for optimal performance  
-- Test motion functions like `driveTo`, `turnToAngle`, and `moveToPoint` individually  
-- Use odometry for advanced navigation (with or without tracking wheels)  
-- Don’t hesitate to reach out to me or the VEX community for help
-- Join our discord (link is in the description)
-
-### 8. Where to Start
-
-- Set up ports and devices in `src/definitions.cpp` and `include/definitions.h`  
-- Input chassis measurements and PID values in `src/definitions.cpp`  
-- Confirm movement and controls via driver control testing  
-- Create and test simple autonomous routines  
-- Expand with more complex logic and paths as you grow confident
-
----
-
-This template is **competition-ready** and provides a strong foundation for building reliable, high-performance autonomous routines using **proven robotics algorithms**, whether or not your robot uses advanced odometry. 
-
-If you find this template useful, please star this repository and subscribe to https://www.youtube.com/@1698V to follow my team's progress and learn more about our programming. 
-
+Use these patterns as building blocks inside `custom/src/autonomous.cpp` to keep autonomous routines concise and readable. Tune PID gains and geometry constants in `src/definitions.cpp` to match your robot.
