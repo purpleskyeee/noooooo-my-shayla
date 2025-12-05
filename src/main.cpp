@@ -14,6 +14,7 @@
 #include "auton_task.h"
 #include "threads.h"
 #include "pid.h"
+#include "motor-control.h"
 
 using namespace vex;
 
@@ -79,19 +80,19 @@ int main() {
   tonguemech.open();
   wait(10,sec);
   tonguemech.close();
-  // wait(100, msec);
-  // autonomous();
-  // startTongueThread(true);
-  // driveTo(33, 2000, true, 12, 0, true);
-  // turnToAngle(-45, 2000, true, 12);
-  // driveTo(1, 500, true, 8, 0, true);
-  // startIntakeThread(12.8, true);
-  // wait(2500, msec);
-  // stopIntakeThread(vex::brakeType::hold);
-  // driveTo(4, 500, true, 8, 0, true);
-  // driveTo(-46, 2000, true, 12, 0, true);
-  // turnToAngle(-180, 2000, true, 12);
-  // stopTongueThread();
+  wait(100, msec);
+  autonomous();
+  tonguemechdown = false;
+  driveTo(33, 2000, true, 12, 0, true);
+  turnToAngle(-45, 2000, true, 12);
+  driveTo(1, 500, true, 8, 0, true);
+  intake_collect = true;
+  wait(2500, msec);
+  intake_collect = false;
+  driveTo(4, 500, true, 8, 0, true);
+  driveTo(-46, 2000, true, 12, 0, true);
+  turnToAngle(-180, 2000, true, 12);
+  tonguemechdown = true;
   while (true) {
     wait(20, msec);
   }

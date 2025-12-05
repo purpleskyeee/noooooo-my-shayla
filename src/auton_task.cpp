@@ -59,10 +59,10 @@ void DriverControl() {
     axis1 = controller_1.Axis1.position();
     Right_Power = axis3 - defensechange * axis1;
     Left_Power = axis3 + defensechange * axis1;
-    if (Right_Power > 128) Right_Power = 128;
-    if (Right_Power < -128) Right_Power = -128;
-    if (Left_Power > 128) Left_Power = 128;
-    if (Left_Power < -128) Left_Power = -128;
+    if (Right_Power > 100) Right_Power = 100;
+    if (Right_Power < -100) Right_Power = -100;
+    if (Left_Power > 100) Left_Power = 100;
+    if (Left_Power < -100) Left_Power = -100;
 
     intake_collect = intakebutnoscore;
     intake_score = score;
