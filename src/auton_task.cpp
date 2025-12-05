@@ -72,15 +72,15 @@ void DriverControl() {
       tonguemechdown = !tonguemechdown;
     }
 
-    if (rubberbandtoggle != lastbandpressstate) {
+    if (rubberbandtoggle != lastbandpressstate && rubberbandtoggle==false) {
       rubberbandon = !rubberbandon;
     }
 
-    if (middescoretoggle != lastdescorepressstate) {
+    if (middescoretoggle != lastdescorepressstate && middescoretoggle==false) {
       middescoreon = !middescoreon;
     }
 
-    if (sidedescoretoggle != lastsiddescorestate) {
+    if (sidedescoretoggle != lastsiddescorestate && sidedescoretoggle==false) {
       descoreup = !descoreup;
     }
 
