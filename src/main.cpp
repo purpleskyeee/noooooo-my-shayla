@@ -21,7 +21,7 @@ using namespace vex;
 // A global instance of competition
 competition Competition;
 
-thread DRIVETRAIN(drivetrain_thread);
+//thread DRIVETRAIN(drivetrain_thread);
 thread INTAKE(intake_thread);
 thread PNEUMATICS(pneumatics_thread);
 
@@ -52,7 +52,25 @@ void pre_auton(void) {
 --------------------------------------------*/
 
 void autonomous(void) {
-  AutonSkills();
+  tonguemechdown = false;
+  driveTo(33, 2000, true, 12, 0, true);
+  turnToAngle(-45, 2000, true, 12);
+  driveTo(1, 500, true, 8, 0, true);
+  intake_outtake = true;
+  wait(2500, msec);
+  intake_outtake = false;
+  driveTo(4, 500, true, 8, 0, true);
+  driveTo(-46, 2000, true, 12, 0, true);
+  turnToAngle(-180, 2000, true, 12);
+  tonguemechdown = true;
+  wait(500, msec);
+  intake_collect = true;
+  driveTo(24, 2000, true, 12, 0, true);
+  intake_collect = false;
+  driveTo(-40, 2000, true, 12, 0, true);
+  intake_score = true;
+  wait(2000, msec);
+  intake_score = false;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -77,22 +95,16 @@ int main() {
   Competition.drivercontrol(usercontrol);
 
   pre_auton();
-  tonguemech.open();
-  wait(10,sec);
-  tonguemech.close();
-  wait(100, msec);
+  
+  // tonguemech.open();
+  // wait(10,sec);
+  // tonguemech.close();
+  // wait(100, msec);
   autonomous();
-  tonguemechdown = false;
-  driveTo(33, 2000, true, 12, 0, true);
-  turnToAngle(-45, 2000, true, 12);
-  driveTo(1, 500, true, 8, 0, true);
-  intake_collect = true;
-  wait(2500, msec);
-  intake_collect = false;
-  driveTo(4, 500, true, 8, 0, true);
-  driveTo(-46, 2000, true, 12, 0, true);
-  turnToAngle(-180, 2000, true, 12);
-  tonguemechdown = true;
+
+  DriverControl();
+
+
   while (true) {
     wait(20, msec);
   }

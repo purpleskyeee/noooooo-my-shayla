@@ -21,42 +21,34 @@ void stopIntake() {
 int drivetrain_thread() {
   bool was_active = false;
   while (true) {
-    bool active = driver_control_active.load();
-    if (active) {
-      double left_mv = kDriveMvScale * defensechange * Left_Power;
-      double right_mv = kDriveMvScale * defensechange * Right_Power;
-      left_chassis.spin(vex::directionType::fwd, left_mv, vex::voltageUnits::mV);
-      right_chassis.spin(vex::directionType::fwd, right_mv, vex::voltageUnits::mV);
-    } else if (was_active) {
-      stopDrive();
-    }
-    was_active = active;
+    double left_mv = kDriveMvScale * defensechange * Left_Power;
+    double right_mv = kDriveMvScale * defensechange * Right_Power;
+    left_chassis.spin(vex::directionType::fwd, left_mv, vex::voltageUnits::mV);
+    right_chassis.spin(vex::directionType::fwd, right_mv, vex::voltageUnits::mV);
+
     vex::this_thread::sleep_for(10);
   }
   return 0;
 }
 
 int intake_thread() {
-  bool was_active = false;
-  while (true) {
-    bool active = driver_control_active.load();
-    if (active) {
-      if (intake_collect) {
-        hoodMotor.spin(vex::directionType::rev, kMaxIntakePowerMv, vex::voltageUnits::mV);
-        intakeMotor.spin(vex::directionType::fwd, kMaxIntakePowerMv, vex::voltageUnits::mV);
-      } else if (intake_score) {
-        hoodMotor.spin(vex::directionType::fwd, kMaxIntakePowerMv, vex::voltageUnits::mV);
-        intakeMotor.spin(vex::directionType::fwd, kMaxIntakePowerMv, vex::voltageUnits::mV);
-      } else if (intake_outtake) {
-        hoodMotor.spin(vex::directionType::rev, kMaxIntakePowerMv, vex::voltageUnits::mV);
-        intakeMotor.spin(vex::directionType::rev, kMaxIntakePowerMv, vex::voltageUnits::mV);
-      } else {
-        stopIntake();
-      }
-    } else if (was_active) {
+  while (true) 
+  {
+    if (intake_collect) {
+      printf("collecting\n");
+      hoodMotor.spin(vex::directionType::rev, kMaxIntakePowerMv, vex::voltageUnits::mV);
+      intakeMotor.spin(vex::directionType::fwd, kMaxIntakePowerMv, vex::voltageUnits::mV);
+    } else if (intake_score) {
+      printf("scoring\n");
+      hoodMotor.spin(vex::directionType::fwd, kMaxIntakePowerMv, vex::voltageUnits::mV);
+      intakeMotor.spin(vex::directionType::fwd, kMaxIntakePowerMv, vex::voltageUnits::mV);
+    } else if (intake_outtake) {
+      printf("outtaking\n");
+      hoodMotor.spin(vex::directionType::rev, kMaxIntakePowerMv, vex::voltageUnits::mV);
+      intakeMotor.spin(vex::directionType::rev, kMaxIntakePowerMv, vex::voltageUnits::mV);
+    } else {
       stopIntake();
     }
-    was_active = active;
     vex::this_thread::sleep_for(10);
   }
   return 0;
@@ -64,31 +56,15 @@ int intake_thread() {
 
 int pneumatics_thread() {
   while (true) {
-    if (driver_control_active.load()) {
-      if (tonguemechdown) {
-        tonguemech.close();
-      } else {
-        tonguemech.open();
-      }
+    
+    tonguemech.set(!tonguemechdown);
 
-      if (rubberbandon) {
-        rubberband.close();
-      } else {
-        rubberband.open();
-      }
+    rubberband.set(rubberbandon);
 
-      if (middescoreon) {
-        middescore.open();
-      } else {
-        middescore.close();
-      }
+    middescore.set(middescoreon);
 
-      if (descoreup) {
-        sidedescore.open();
-      } else {
-        sidedescore.close();
-      }
-    }
+    sidedescore.set(descoreup);
+
     vex::this_thread::sleep_for(10);
   }
   return 0;
