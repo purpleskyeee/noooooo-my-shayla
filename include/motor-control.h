@@ -18,11 +18,24 @@ void turnToAngle(double turn_angle, double time_limit_msec, bool exit = true, do
 // Rotate the robot by a relative angle (degrees) using the turn PID.
 // Positive delta turns to the right, negative to the left.
 void rotateBy(double delta_angle_deg, double time_limit_msec, bool exit = true, double max_output = 12);
-// driveTo(distance_in, time_limit_msec, exit, max_output, exit_velocity, enforce_heading)
+// driveTo(distance_in, time_limit_msec, exit, max_output, exit_velocity, enforce_heading, coast_start)
 // - If `enforce_heading` is true, `driveTo` will pre-align the robot to
 //   `correct_angle` before driving and (when `exit==true`) re-align to
 //   `correct_angle` afterwards. This is optional and default false.
-void driveTo(double distance_in, double time_limit_msec, bool exit = true, double max_output = 12, double exit_velocity = 0, bool enforce_heading = false);
+// - If `coast_start` is false, the function will not issue the initial
+//   stop/brake call, letting you roll from a previous maneuver.
+void driveTo(double distance_in, double time_limit_msec, bool exit = true, double max_output = 12, double exit_velocity = 0, bool enforce_heading = false, bool coast_start = true);
+// Turn most of the way, then let the forward drive PID finish the heading
+// while driving the specified distance.
+void turnPartialThenDrive(double final_heading_deg,
+						  double distance_in,
+						  double turn_portion = 0.83,
+						  double turn_time_limit_msec = 700,
+						  double drive_time_limit_msec = 1500,
+						  double turn_max_output = 12.0,
+						  double drive_max_output = 12.0,
+						  double exit_tolerance_deg = 4.0,
+						  double drive_exit_velocity = 0.0);
 void curveCircle(double result_angle_deg, double center_radius, double time_limit_msec, bool exit = true, double max_output = 12);
 // Use two distance sensors (front and right) to correct pose.
 // - `front_mm` and `right_mm` are sensor readings in millimeters.

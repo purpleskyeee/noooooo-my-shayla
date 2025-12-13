@@ -370,6 +370,69 @@ void rotateBy(double delta_angle_deg, double time_limit_msec, bool exit, double 
   turnToAngle(target, time_limit_msec, exit, max_output);
 }
 
+// Turn most of the way, then let the forward PID finish the heading while driving.
+void turnPartialThenDrive(double final_heading_deg,
+                          double distance_in,
+                          double turn_portion,
+                          double turn_time_limit_msec,
+                          double drive_time_limit_msec,
+                          double turn_max_output,
+                          double drive_max_output,
+                          double exit_tolerance_deg,
+                          double drive_exit_velocity) {
+  auto angleErrorDeg = [](double target, double current) {
+    double err = target - current;
+    while (err > 180) err -= 360;
+    while (err < -180) err += 360;
+    return err;
+  };
+
+  double portion = turn_portion;
+  if (portion < 0.1) portion = 0.1;
+  if (portion > 1.0) portion = 1.0;
+
+  stopChassis(vex::brakeType::coast);
+  is_turning = true;
+
+  double desired_heading = normalizeTarget(final_heading_deg);
+  double start_heading = getInertialHeading();
+  double delta_deg = angleErrorDeg(desired_heading, start_heading);
+  double partial_target = normalizeTarget(start_heading + delta_deg * portion);
+
+  PID pid = PID(turn_kp, turn_ki, turn_kd);
+  pid.setTarget(partial_target);
+  pid.setIntegralMax(0);
+  pid.setIntegralRange(3);
+  pid.setSmallBigErrorTolerance(exit_tolerance_deg, exit_tolerance_deg * 3);
+  pid.setSmallBigErrorDuration(15, 120);
+  pid.setDerivativeTolerance(exit_tolerance_deg * 8);
+
+  double start_time = Brain.timer(msec);
+  double output = 0;
+  while (Brain.timer(msec) - start_time <= turn_time_limit_msec) {
+    double heading = getInertialHeading();
+    double error = angleErrorDeg(partial_target, heading);
+
+    output = pid.update(heading);
+    if (output > turn_max_output) output = turn_max_output;
+    else if (output < -turn_max_output) output = -turn_max_output;
+
+    driveChassis(output, -output);
+
+    if (fabs(error) <= exit_tolerance_deg) {
+      break;
+    }
+    wait(10, msec);
+  }
+
+  // Do not brake; let the drive step carry the remaining momentum.
+  is_turning = false;
+  correct_angle = desired_heading;
+
+  // Forward PID will clean up the remaining heading error to the desired heading.
+  driveTo(distance_in, drive_time_limit_msec, true, drive_max_output, drive_exit_velocity, false, false);
+}
+
 void alignToSetHeading(double time_limit_msec, double max_output) {
   double target = normalizeTarget(correct_angle);
   turnToAngle(target, time_limit_msec, true, max_output);
@@ -563,10 +626,12 @@ bool correctHeadingFromSensors(int samples, double max_apply_shift_in,
  * - exit: If true, stops the robot at the end; if false, allows chaining.
  * - max_output: Maximum voltage output to motors.
  */
-void driveTo(double distance_in, double time_limit_msec, bool exit, double max_output, double exit_velocity, bool enforce_heading) {
+void driveTo(double distance_in, double time_limit_msec, bool exit, double max_output, double exit_velocity, bool enforce_heading, bool coast_start) {
   // Store initial encoder values
+  if(coast_start) {
+    stopChassis(vex::brakeType::coast);
+  }
   double start_left = getLeftRotationDegree(), start_right = getRightRotationDegree();
-  stopChassis(vex::brakeType::coast);
   is_turning = true;
   double threshold = 0.5;
   int drive_direction = distance_in > 0 ? 1 : -1;
