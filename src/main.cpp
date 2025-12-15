@@ -52,6 +52,7 @@ void pre_auton(void) {
 --------------------------------------------*/
 
 void autonomous(void) {
+  rubberbandon = true;
   tonguemechdown = false;
   driveTo(33, 2000, true, 12, 0, true);
   turnToAngle(-45, 2000, true, 12);
@@ -60,7 +61,7 @@ void autonomous(void) {
   wait(2500, msec);
   intake_outtake = false;
   driveTo(4, 500, true, 8, 0, true);
-  driveTo(-46, 2000, true, 12, 0, true);
+  driveTo(-48, 2000, true, 12, 0, true);
   turnToAngle(-180, 2000, true, 12);
   tonguemechdown = true;
   wait(500, msec);
@@ -82,28 +83,25 @@ void autonomous(void) {
 /*                                                                           */
 /*  You must modify the code to add your own robot specific commands here.   */
 /*---------------------------------------------------------------------------*/
-
+int ch1, ch2, ch3, ch4;
+bool l1, l2, r1, r2;
+bool button_a, button_b, button_x, button_y;
+bool button_up_arrow, button_down_arrow, button_left_arrow, button_right_arrow;
+int chassis_flag = 0;
+int MAXVELOCITY = 12800;
 void usercontrol(void) {
-  DriverControl();
+ DriverControl();
 }
 
 //
 // Main will set up the competition functions and callbacks.
 //
 int main() {
+  pre_auton();
   Competition.autonomous(autonomous);
   Competition.drivercontrol(usercontrol);
-
-  pre_auton();
-  
-  // tonguemech.open();
-  // wait(10,sec);
-  // tonguemech.close();
-  // wait(100, msec);
   autonomous();
-
-  DriverControl();
-
+  usercontrol();
 
   while (true) {
     wait(20, msec);
