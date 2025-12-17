@@ -1,3 +1,7 @@
+// Guard against multiple inclusion from top-level and nested veryfunny includes
+#ifndef MOTOR_CONTROL_H
+#define MOTOR_CONTROL_H
+
 #include <string>
 #include <cmath>
 
@@ -59,6 +63,9 @@ void boomerang(double x, double y, int dir, double a, double dlead, double time_
 // Align to the currently stored `correct_angle` (previous heading set).
 // Calls `turnToAngle(normalizeTarget(correct_angle), ...)`.
 void alignToSetHeading(double time_limit_msec = 800, double max_output = 12);
+
+// Directly set intake/hood voltage for autonomous sequences (mV, clamps to [-12000,12000]).
+void setAutonIntakeVoltage(double voltage_mv, bool reverse = false);
 // Read front/right distance sensors, average samples, validate range, and
 // call `correctPoseFromFrontRightDistances` using the geometry constants set
 // in robot-config. Returns true if correction was applied. `max_apply_shift_in`
@@ -82,3 +89,5 @@ bool isIntakeThreadRunning();
 void startTongueThread(bool closeWhenStopped = false);
 void stopTongueThread();
 bool isTongueThreadRunning();
+
+#endif // MOTOR_CONTROL_H

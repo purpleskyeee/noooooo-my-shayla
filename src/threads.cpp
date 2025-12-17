@@ -64,6 +64,7 @@ int pneumatics_thread() {
     middescore.set(middescoreon);
 
     sidedescore.set(descoreup);
+    portd_piston.set(portd_on);
 
     vex::this_thread::sleep_for(10);
   }

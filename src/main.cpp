@@ -25,32 +25,12 @@ competition Competition;
 thread INTAKE(intake_thread);
 thread PNEUMATICS(pneumatics_thread);
 
-/*---------------------------------------------------------------------------*/
-/*                          Pre-Autonomous Functions                         */
-/*                                                                           */
-/*  You may want to perform some actions before the competition starts.      */
-/*  Do them in the following function.  You must return from this function   */
-/*  or the autonomous and usercontrol tasks will not be started.  This       */
-/*  function is only called once after the V5 has been powered on and        */
-/*  not every time that the robot is disabled.                               */
-/*---------------------------------------------------------------------------*/
-
+// Pre-match setup
 void pre_auton(void) {
   PreAuton();
 }
 
-/*---------------------------------------------------------------------------*/
-/*                                                                           */
-/*                              Autonomous Task                              */
-/*                                                                           */
-/*  This task is used to control your robot during the autonomous phase of   */
-/*  a VEX Competition.                                                       */
-/*                                                                           */
-/*  You must modify the code to add your own robot specific commands here.   */
-/*                                                                           */
-/*-------------------------------
---------------------------------------------*/
-
+// Keep the existing autonomous routine from this project
 void autonomous(void) {
   rubberbandon = true;
   tonguemechdown = false;
@@ -74,35 +54,147 @@ void autonomous(void) {
   intake_score = false;
 }
 
-/*---------------------------------------------------------------------------*/
-/*                                                                           */
-/*                              User Control Task                            */
-/*                                                                           */
-/*  This task is used to control your robot during the user control phase of */
-/*  a VEX Competition.                                                       */
-/*                                                                           */
-/*  You must modify the code to add your own robot specific commands here.   */
-/*---------------------------------------------------------------------------*/
-int ch1, ch2, ch3, ch4;
-bool l1, l2, r1, r2;
-bool button_a, button_b, button_x, button_y;
-bool button_up_arrow, button_down_arrow, button_left_arrow, button_right_arrow;
-int chassis_flag = 0;
-int MAXVELOCITY = 12800;
+// Driver control loop (local implementation)
 void usercontrol(void) {
- DriverControl();
+  constexpr int MAXVELOCITY = 12800;
+  // Ensure intake thread is stopped and intakes are idle before driver loop
+  INTAKE.interrupt();
+  PNEUMATICS.interrupt();
+  hoodMotor.stop();
+  intakeMotor.stop();
+  intake_collect = false;
+  intake_score = false;
+  intake_outtake = false;
+
+  // Keep rubberband passively extended (vented) at start of driver control
+  rubberbandon = false;
+  rubberband.open();
+
+  // Default Port D piston retracted (closed) so it starts down
+  portd_on = true;
+  portd_piston.close();
+
+  // Keep tongue mech passively retracted at start of driver control
+  tonguemechdown = false;
+  tonguemech.open();
+
+  stopChassis(coast);
+  heading_correction = false;
+  while (true) {
+    // Read controller axes
+    int ch1 = controller_1.Axis1.value();
+    int ch2 = controller_1.Axis2.value();
+    int ch3 = controller_1.Axis3.value();
+    int ch4 = controller_1.Axis4.value();
+
+    // Buttons
+    bool l1 = controller_1.ButtonL1.pressing();
+    bool l2 = controller_1.ButtonL2.pressing();
+    bool r1 = controller_1.ButtonR1.pressing();
+    bool r2 = controller_1.ButtonR2.pressing();
+    bool button_y = controller_1.ButtonY.pressing();
+    bool button_right = controller_1.ButtonRight.pressing();
+    bool button_down = controller_1.ButtonDown.pressing();
+    bool button_up = controller_1.ButtonUp.pressing();
+    bool button_a = controller_1.ButtonA.pressing();
+
+    bool intakebutnoscore = r1;
+    bool score = r2;
+    bool tonguemechtoggle = l2;
+    bool outtake = l1;
+
+    bool rubberbandtoggle = button_y;
+    bool middescoretoggle = button_up;        // mid descore on up button
+    bool sidedescoretoggle = button_right;    // side descore moved to right button to avoid overlap
+    bool portdtoggle = button_down;           // Port D piston on down button
+    bool defensing = button_a;
+
+    axis3 = controller_1.Axis3.position();
+    axis1 = controller_1.Axis1.position();
+    Right_Power = axis3 - defensechange * axis1;
+    Left_Power = axis3 + defensechange * axis1;
+    if (Right_Power > 128) Right_Power = 128;
+    if (Right_Power < -128) Right_Power = -128;
+    if (Left_Power > 128) Left_Power = 128;
+    if (Left_Power < -128) Left_Power = -128;
+
+    if (intakebutnoscore) {
+      hoodMotor.spin(vex::directionType::rev, MAXVELOCITY, vex::voltageUnits::mV);
+      intakeMotor.spin(vex::directionType::fwd, MAXVELOCITY, vex::voltageUnits::mV);
+    } else if (score) {
+      hoodMotor.spin(vex::directionType::fwd, MAXVELOCITY, vex::voltageUnits::mV);
+      intakeMotor.spin(vex::directionType::fwd, MAXVELOCITY, vex::voltageUnits::mV);
+    } else if (outtake) {
+      hoodMotor.spin(vex::directionType::rev, MAXVELOCITY, vex::voltageUnits::mV);
+      intakeMotor.spin(vex::directionType::rev, MAXVELOCITY, vex::voltageUnits::mV);
+    } else {
+      hoodMotor.stop();
+      intakeMotor.stop();
+    }
+
+    if (tonguemechtoggle != lasttonguepressstate) {
+      tonguemechdown = !tonguemechdown;
+    }
+
+    if (rubberbandtoggle && !lastbandpressstate) {
+      rubberbandon = !rubberbandon;
+    }
+
+    if (middescoretoggle && !lastdescorepressstate) {
+      middescoreon = !middescoreon;
+    }
+
+    if (sidedescoretoggle && !lastsiddescorestate) {
+      descoreup = !descoreup;
+    }
+
+    if (portdtoggle && !lastportdpressstate) {
+      portd_on = !portd_on;
+    }
+
+    if (portdtoggle && !lastportdpressstate) {
+      portd_on = !portd_on;
+    }
+
+    if (defensing != lastdefensestate) {
+      defensechange *= -1;
+    }
+
+    lasttonguepressstate = tonguemechtoggle;
+    if (tonguemechdown) tonguemech.close();
+    else tonguemech.open();
+
+    lastbandpressstate = rubberbandtoggle;
+    if (rubberbandon) rubberband.close();
+    else rubberband.open();
+
+    lastdescorepressstate = middescoretoggle;
+    if (middescoreon) middescore.open();
+    else middescore.close();
+
+    lastsiddescorestate = sidedescoretoggle;
+    if (descoreup) sidedescore.open();
+    else sidedescore.close();
+
+    lastportdpressstate = portdtoggle;
+    if (portd_on) portd_piston.close();
+    else portd_piston.open();
+
+    lastportdpressstate = portdtoggle;
+    if (portd_on) portd_piston.close();
+    else portd_piston.open();
+
+    left_chassis.spin(vex::directionType::fwd, 128 * defensechange * Left_Power, vex::voltageUnits::mV);
+    right_chassis.spin(vex::directionType::fwd, 128 * defensechange * Right_Power, vex::voltageUnits::mV);
+
+    wait(10, msec);
+  }
 }
 
-//
-// Main will set up the competition functions and callbacks.
-//
 int main() {
   pre_auton();
   Competition.autonomous(autonomous);
   Competition.drivercontrol(usercontrol);
-  autonomous();
-  usercontrol();
-
   while (true) {
     wait(20, msec);
   }

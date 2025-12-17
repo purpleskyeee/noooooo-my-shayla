@@ -5,6 +5,7 @@
 #include <cmath>
 #include <tuple>
 #include <atomic>
+#include <algorithm>
 #include "motor-control.h"
 #include "auton_functions.h"
 #include "definitions.h"
@@ -44,6 +45,12 @@ double clampIntakeVoltage(double volts) {
   return volts;
 }
 
+double clampIntakeMv(double mv) {
+  if (mv > 12000.0) return 12000.0;
+  if (mv < -12000.0) return -12000.0;
+  return mv;
+}
+
 int intakeThreadMain() {
   intake_thread_running = true;
   while (intake_thread_should_run.load()) {
@@ -75,6 +82,22 @@ int tongueThreadMain() {
   tongue_thread_running = false;
   return 0;
 }
+}
+
+// ============================================================================
+// AUTON INTAKE HELPER
+// ============================================================================
+
+void setAutonIntakeVoltage(double voltage_mv, bool reverse) {
+  double mv = clampIntakeMv(voltage_mv);
+  if (fabs(mv) < 1.0) {
+    hoodMotor.stop(vex::brakeType::coast);
+    intakeMotor.stop(vex::brakeType::coast);
+    return;
+  }
+  auto dir = reverse ? vex::directionType::rev : vex::directionType::fwd;
+  hoodMotor.spin(vex::directionType::rev, fabs(mv), vex::voltageUnits::mV);
+  intakeMotor.spin(dir, fabs(mv), vex::voltageUnits::mV);
 }
 
 // ============================================================================

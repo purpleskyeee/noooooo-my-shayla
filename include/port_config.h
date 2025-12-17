@@ -29,6 +29,7 @@
 // Triport pneumatics
 #define TONGUE_TRI_PORT    Brain.ThreeWirePort.B
 #define RUBBER_BAND_PORT   Brain.ThreeWirePort.C
+#define PORT_D_PISTON      Brain.ThreeWirePort.D
 #define MID_DESCORE_PORT   Brain.ThreeWirePort.E
 #define SIDE_DESCORE_PORT  Brain.ThreeWirePort.F
 #define CLAW_PORT          Brain.ThreeWirePort.F
