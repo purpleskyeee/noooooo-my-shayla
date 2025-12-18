@@ -5,6 +5,7 @@
 #include "definitions.h"
 #include "motor-control.h"
 #include "threads.h"
+#include <iostream>
 #include "../custom/include/ball-indexer.h"
 
 void AutonSkills() {
@@ -34,67 +35,90 @@ void AutonSkills() {
 }
 
 void DriverControl() {
-  driver_control_active.store(true);
-  stopChassis(vex::brakeType::coast);
-  heading_correction = false;
+  bool driveEngaged = false;
+  bool intakeEngaged = true;
+  bool ptoEngaged = false;
+  bool lastL1 = false;
+  bool lastY = false;
+  bool hoodEngaged = false;
+  bool lastB = false;
+  bool midScoreEngaged = true;
 
-  bool lasttonguepressstate = false;
-  bool lastbandpressstate = false;
-  bool lastdescorepressstate = false;
-  bool lastsiddescorestate = false;
-  bool lastdefensestate = false;
+  // Set default states
+  rubberband.set(midScoreEngaged);
+  flap.set(hoodEngaged);
 
   while (true) {
-    bool intakebutnoscore = controller_1.ButtonR1.pressing();
-    bool score = controller_1.ButtonR2.pressing();
-    bool tonguemechtoggle = controller_1.ButtonL2.pressing();
-    bool outtake = controller_1.ButtonL1.pressing();
+    // Arcade control scheme
+    int dir = controller_1.Axis3.position();
+    int turn = controller_1.Axis1.position();
+    int left_power = dir - turn;
+    int right_power = dir + turn;
+    if (left_power > 100) left_power = 100;
+    if (left_power < -100) left_power = -100;
+    if (right_power > 100) right_power = 100;
+    if (right_power < -100) right_power = -100;
+    left_chassis.spin(vex::directionType::fwd, left_power * -128 / 100, vex::voltageUnits::mV);
+    right_chassis.spin(vex::directionType::fwd, right_power * -128 / 100, vex::voltageUnits::mV);
 
-    bool rubberbandtoggle = controller_1.ButtonY.pressing();
-    bool middescoretoggle = controller_1.ButtonRight.pressing();
-    bool sidedescoretoggle = controller_1.ButtonDown.pressing();
-    bool defensing = controller_1.ButtonA.pressing();
+    if(driveEngaged){
+      intake1Motor.spin(vex::directionType::fwd, left_power * -128 / 100, vex::voltageUnits::mV);
+      intake2Motor.spin(vex::directionType::fwd, right_power * -128 / 100, vex::voltageUnits::mV);
+    } 
+    if(intakeEngaged){
+      if(controller_1.ButtonR1.pressing()){
+        intake1Motor.spin(vex::directionType::fwd, 12000, vex::voltageUnits::mV);
+        intake2Motor.spin(vex::directionType::fwd, 12000, vex::voltageUnits::mV);
+      } else if(controller_1.ButtonR2.pressing()){
+        intake1Motor.spin(vex::directionType::rev, 12000, vex::voltageUnits::mV);
+        intake2Motor.spin(vex::directionType::rev, 12000, vex::voltageUnits::mV);
+      } else {
+        intake1Motor.stop();
+        intake2Motor.stop();
+      }
+    }
+    
+    // PTO control scheme
+    bool currentL1 = controller_1.ButtonL1.pressing();
+    if (currentL1 && !lastL1) {
+      ptoEngaged = !ptoEngaged;
+      pto.set(ptoEngaged);
+      driveEngaged = ptoEngaged;
+      intakeEngaged = !ptoEngaged;
+    }
+    lastL1 = currentL1;
 
-    axis3 = controller_1.Axis3.position();
-    axis1 = controller_1.Axis1.position();
-    Right_Power = axis3 - defensechange * axis1;
-    Left_Power = axis3 + defensechange * axis1;
-    if (Right_Power > 100) Right_Power = 100;
-    if (Right_Power < -100) Right_Power = -100;
-    if (Left_Power > 100) Left_Power = 100;
-    if (Left_Power < -100) Left_Power = -100;
-
-    intake_collect = intakebutnoscore;
-    intake_score = score;
-    intake_outtake = outtake;
-
-    if (tonguemechtoggle != lasttonguepressstate) {
-      tonguemechdown = !tonguemechdown;
+    // Tongue mech control
+    if (controller_1.ButtonL2.pressing()) {
+      tonguemech.set(false);
+    } else {
+      tonguemech.set(true);
     }
 
-    if (rubberbandtoggle != lastbandpressstate && rubberbandtoggle==false) {
-      rubberbandon = !rubberbandon;
+    // Mid goal piston control
+    bool currentY = controller_1.ButtonY.pressing();
+    if (currentY && !lastY) {
+      midScoreEngaged = !midScoreEngaged;
+      rubberband.set(midScoreEngaged);
+    }
+    lastY = currentY;
+
+    // Hood piston control
+    bool currentB = controller_1.ButtonB.pressing();
+    if (currentB && !lastB) {
+      hoodEngaged = !hoodEngaged;
+      flap.set(hoodEngaged);
+    }
+    lastB = currentB;
+
+    // Side descore piston control
+    if (controller_1.ButtonRight.pressing()) {
+      sidedescore.set(false);
+    } else {
+      sidedescore.set(true);
     }
 
-    if (middescoretoggle != lastdescorepressstate && middescoretoggle==false) {
-      middescoreon = !middescoreon;
-    }
-
-    if (sidedescoretoggle != lastsiddescorestate && sidedescoretoggle==false) {
-      descoreup = !descoreup;
-    }
-
-    if (defensing != lastdefensestate) {
-      defensechange *= -1;
-    }
-
-    lasttonguepressstate = tonguemechtoggle;
-    lastbandpressstate = rubberbandtoggle;
-    lastdescorepressstate = middescoretoggle;
-    lastsiddescorestate = sidedescoretoggle;
-    lastdefensestate = defensing;
-
-    vex::this_thread::sleep_for(10);
+    vex::wait(20, vex::msec);
   }
 }
 

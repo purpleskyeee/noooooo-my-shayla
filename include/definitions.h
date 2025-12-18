@@ -29,12 +29,13 @@ extern distance example_distance_sensor;
 extern digital_out example_piston;
 extern rotation horizontal_tracker;
 extern rotation vertical_tracker;
-extern motor intakeMotor;
-extern motor hoodMotor;
+extern motor intake1Motor;
+extern motor intake2Motor;
 extern pneumatics tonguemech;
 extern pneumatics rubberband;
-extern pneumatics middescore;
+extern pneumatics flap;
 extern pneumatics sidedescore;
+extern pneumatics pto;
 
 extern motor arm_motor1;
 extern motor arm_motor2;
@@ -96,12 +97,18 @@ extern double Right_Power;
 extern double Left_Power;
 extern bool tonguemechdown;
 extern bool rubberbandon;
-extern bool middescoreon;
+extern bool flapdown;
 extern bool descoreup;
 extern int defensechange;
 extern bool intake_collect;
-extern bool intake_score;
+extern bool intake_in;
 extern bool intake_outtake;
+extern bool flapdown;
+extern bool ptoengaged;
+extern bool LastL1;
+extern bool driveEngaged;
+extern bool intakeEngaged;
+
 extern std::atomic<bool> driver_control_active;
 
 // Lifecycle hooks

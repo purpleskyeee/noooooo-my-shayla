@@ -19,9 +19,9 @@ static double clampVolt(double v) {
 }
 
 void spinIntakePair(double intakeVolt, double hoodVolt) {
-  intakeMotor.spin(intakeVolt >= 0 ? vex::directionType::fwd : vex::directionType::rev,
+  intake1Motor.spin(intakeVolt >= 0 ? vex::directionType::fwd : vex::directionType::rev,
                    fabs(intakeVolt), vex::voltageUnits::volt);
-  hoodMotor.spin(hoodVolt >= 0 ? vex::directionType::fwd : vex::directionType::rev,
+  intake2Motor.spin(hoodVolt >= 0 ? vex::directionType::fwd : vex::directionType::rev,
                  fabs(hoodVolt), vex::voltageUnits::volt);
 }
 
@@ -41,8 +41,8 @@ void startIntakeOuttake(double voltage) {
 }
 
 void stopIntakeRoller(vex::brakeType stopMode) {
-  intakeMotor.stop(stopMode);
-  hoodMotor.stop(stopMode);
+  intake1Motor.stop(stopMode);
+  intake2Motor.stop(stopMode);
 }
 
 void startIndexerIntake() {

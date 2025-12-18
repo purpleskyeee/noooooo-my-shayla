@@ -21,9 +21,9 @@ using namespace vex;
 // A global instance of competition
 competition Competition;
 
-//thread DRIVETRAIN(drivetrain_thread);
+// thread DRIVETRAIN(drivetrain_thread);
 thread INTAKE(intake_thread);
-thread PNEUMATICS(pneumatics_thread);
+// thread PNEUMATICS(pneumatics_thread);
 
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
@@ -52,7 +52,7 @@ void pre_auton(void) {
 --------------------------------------------*/
 
 void autonomous(void) {
-  rubberbandon = true;
+  ptoengaged = false;
   tonguemechdown = false;
   driveTo(33, 2000, true, 12, 0, true);
   turnToAngle(-45, 2000, true, 12);
@@ -61,19 +61,16 @@ void autonomous(void) {
   wait(2500, msec);
   intake_outtake = false;
   driveTo(4, 500, true, 8, 0, true);
-  driveTo(-48, 2000, true, 12, 0, true);
+  driveTo(-46, 2000, true, 12, 0, true);
   turnToAngle(-180, 2000, true, 12);
   tonguemechdown = true;
   wait(500, msec);
   intake_collect = true;
-  driveTo(24, 2000, true, 12, 0, true);
+  driveTo(24, 2000, true, 12,0, true);
   intake_collect = false;
   driveTo(-40, 2000, true, 12, 0, true);
-  intake_score = true;
-  wait(2000, msec);
-  intake_score = false;
+  intake_in = true;
 }
-
 /*---------------------------------------------------------------------------*/
 /*                                                                           */
 /*                              User Control Task                            */
@@ -83,25 +80,24 @@ void autonomous(void) {
 /*                                                                           */
 /*  You must modify the code to add your own robot specific commands here.   */
 /*---------------------------------------------------------------------------*/
-int ch1, ch2, ch3, ch4;
-bool l1, l2, r1, r2;
-bool button_a, button_b, button_x, button_y;
-bool button_up_arrow, button_down_arrow, button_left_arrow, button_right_arrow;
-int chassis_flag = 0;
-int MAXVELOCITY = 12800;
+
 void usercontrol(void) {
- DriverControl();
+  DriverControl();
 }
 
 //
 // Main will set up the competition functions and callbacks.
 //
 int main() {
+  // Competition.autonomous(autonomous);
+  // Competition.drivercontrol(usercontrol);
+
   pre_auton();
-  Competition.autonomous(autonomous);
-  Competition.drivercontrol(usercontrol);
-  autonomous();
-  usercontrol();
+
+  //autonomous();
+
+  DriverControl();
+
 
   while (true) {
     wait(20, msec);

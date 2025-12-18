@@ -12,25 +12,26 @@ brain Brain;
 // VEXcode device constructors
 controller controller_1 = controller(primary);
 
-motor left_chassis1 = motor(LEFT_CHASSIS1_PORT, ratio6_1, true);
-motor left_chassis2 = motor(LEFT_CHASSIS2_PORT, ratio6_1, true);
-motor left_chassis3 = motor(LEFT_CHASSIS3_PORT, ratio6_1, true);
+motor left_chassis1 = motor(LEFT_CHASSIS1_PORT, ratio6_1, false);
+motor left_chassis2 = motor(LEFT_CHASSIS2_PORT, ratio6_1, false);
+motor left_chassis3 = motor(LEFT_CHASSIS3_PORT, ratio6_1, false);
 motor_group left_chassis = motor_group(left_chassis1, left_chassis2, left_chassis3);
-motor right_chassis1 = motor(RIGHT_CHASSIS1_PORT, ratio6_1, false);
-motor right_chassis2 = motor(RIGHT_CHASSIS2_PORT, ratio6_1, false);
-motor right_chassis3 = motor(RIGHT_CHASSIS3_PORT, ratio6_1, false);
+motor right_chassis1 = motor(RIGHT_CHASSIS1_PORT, ratio6_1, true);
+motor right_chassis2 = motor(RIGHT_CHASSIS2_PORT, ratio6_1, true);
+motor right_chassis3 = motor(RIGHT_CHASSIS3_PORT, ratio6_1, true);
 motor_group right_chassis = motor_group(right_chassis1, right_chassis2, right_chassis3);
 
 inertial inertial_sensor = inertial(INERTIAL_SENSOR_PORT);
 optical example_optical_sensor = optical(OPTICAL_SENSOR_PORT);
 distance example_distance_sensor = distance(DISTANCE_SENSOR_PORT);
 digital_out example_piston = digital_out(Brain.ThreeWirePort.A);
-motor intakeMotor = motor(INTAKE_MOTOR_PORT, ratio6_1, false);
-motor hoodMotor = motor(HOOD_MOTOR_PORT, ratio6_1, false);
+motor intake1Motor = motor(INTAKE1_MOTOR_PORT, ratio6_1, false);
+motor intake2Motor = motor(INTAKE2_MOTOR_PORT, ratio6_1, true);
 pneumatics tonguemech = pneumatics(TONGUE_TRI_PORT);
 pneumatics rubberband = pneumatics(RUBBER_BAND_PORT);
-pneumatics middescore = pneumatics(MID_DESCORE_PORT);
+pneumatics flap = pneumatics(FLAP_PORT);
 pneumatics sidedescore = pneumatics(SIDE_DESCORE_PORT);
+pneumatics pto = pneumatics(PTO_TRI_PORT);
 
 rotation horizontal_tracker = rotation(HORIZONTAL_TRACKER_PORT, true);
 rotation vertical_tracker = rotation(VERTICAL_TRACKER_PORT, true);
@@ -95,12 +96,16 @@ double Right_Power = 0;
 double Left_Power = 0;
 bool tonguemechdown = false;
 bool rubberbandon = false;
-bool middescoreon = false;
 bool descoreup = false;
 int defensechange = 1;
 bool intake_collect = false;
-bool intake_score = false;
+bool intake_in = false;
 bool intake_outtake = false;
+bool flapdown = true;
+bool ptoengaged = false;
+bool driveEngaged = false;
+bool intakeEngaged = true;
+
 std::atomic<bool> driver_control_active{false};
 
 // VEXcode generated functions

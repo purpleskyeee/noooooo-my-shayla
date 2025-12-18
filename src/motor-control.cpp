@@ -51,12 +51,12 @@ int intakeThreadMain() {
     bool reverse = intake_thread_reverse.load();
     vex::directionType hoodDir = vex::directionType::rev;
     vex::directionType intakeDir = reverse ? vex::directionType::rev : vex::directionType::fwd;
-    hoodMotor.spin(hoodDir, v, vex::voltageUnits::volt);
-    intakeMotor.spin(intakeDir, v, vex::voltageUnits::volt);
+    intake2Motor.spin(hoodDir, v, vex::voltageUnits::volt);
+    intake1Motor.spin(intakeDir, v, vex::voltageUnits::volt);
     vex::wait(10, vex::msec);
   }
-  hoodMotor.stop(vex::brakeType::coast);
-  intakeMotor.stop(vex::brakeType::coast);
+  intake2Motor.stop(vex::brakeType::coast);
+  intake1Motor.stop(vex::brakeType::coast);
   intake_thread_running = false;
   return 0;
 }
@@ -143,8 +143,8 @@ void startIntakeThread(double voltage, bool reverse) {
 
 void stopIntakeThread(vex::brakeType stopType) {
   if (!intake_thread_should_run.load() && intake_thread_handle == nullptr) {
-    hoodMotor.stop(stopType);
-    intakeMotor.stop(stopType);
+    intake2Motor.stop(stopType);
+    intake1Motor.stop(stopType);
     return;
   }
   intake_thread_should_run = false;
@@ -153,8 +153,8 @@ void stopIntakeThread(vex::brakeType stopType) {
     delete intake_thread_handle;
     intake_thread_handle = nullptr;
   }
-  hoodMotor.stop(stopType);
-  intakeMotor.stop(stopType);
+  intake2Motor.stop(stopType);
+  intake1Motor.stop(stopType);
 }
 
 bool isIntakeThreadRunning() {
@@ -565,6 +565,7 @@ bool correctHeadingFromSensors(int samples, double max_apply_shift_in,
  */
 void driveTo(double distance_in, double time_limit_msec, bool exit, double max_output, double exit_velocity, bool enforce_heading) {
   // Store initial encoder values
+  std::cout<<"DriveTo called with distance: "<<distance_in<<" inches\n";
   double start_left = getLeftRotationDegree(), start_right = getRightRotationDegree();
   stopChassis(vex::brakeType::coast);
   is_turning = true;
