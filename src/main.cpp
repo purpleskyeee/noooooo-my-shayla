@@ -22,7 +22,7 @@ using namespace vex;
 competition Competition;
 
 // thread DRIVETRAIN(drivetrain_thread);
-thread INTAKE(intake_thread);
+// thread INTAKE(intake_thread);
 // thread PNEUMATICS(pneumatics_thread);
 
 /*---------------------------------------------------------------------------*/
