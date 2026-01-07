@@ -6,8 +6,15 @@
 #include <tuple>
 #include <atomic>
 #include "motor-control.h"
-#include "auton_functions.h"
 #include "definitions.h"
+
+// Module-level globals declared in motor-control.h
+bool is_turning = false;
+double xpos = 0.0;
+double ypos = 0.0;
+double correct_angle = 0.0;
+double prev_left_output = 0.0;
+double prev_right_output = 0.0;
 
 /*
  * MOTOR CONTROL MODULE MAP
@@ -20,64 +27,6 @@
  */
 
 // ============================================================================
-// INTERNAL STATE (DO NOT CHANGE)
-// ============================================================================
-bool is_turning = false;
-double prev_left_output = 0, prev_right_output = 0;
-double x_pos = 0, y_pos = 0;
-double correct_angle = 0;
-
-namespace {
-std::atomic<bool> intake_thread_should_run{false};
-std::atomic<bool> intake_thread_running{false};
-std::atomic<double> intake_thread_voltage{12.0};
-std::atomic<bool> intake_thread_reverse{false};
-vex::thread* intake_thread_handle = nullptr;
-std::atomic<bool> tongue_thread_should_run{false};
-std::atomic<bool> tongue_thread_running{false};
-std::atomic<bool> tongue_thread_close_when_stopped{true};
-vex::thread* tongue_thread_handle = nullptr;
-
-double clampIntakeVoltage(double volts) {
-  if (volts > 12.0) return 12.0;
-  if (volts < 0) return 0.0;
-  return volts;
-}
-
-int intakeThreadMain() {
-  intake_thread_running = true;
-  while (intake_thread_should_run.load()) {
-    double v = clampIntakeVoltage(fabs(intake_thread_voltage.load()));
-    bool reverse = intake_thread_reverse.load();
-    vex::directionType hoodDir = vex::directionType::rev;
-    vex::directionType intakeDir = reverse ? vex::directionType::rev : vex::directionType::fwd;
-    intake2Motor.spin(hoodDir, v, vex::voltageUnits::volt);
-    intake1Motor.spin(intakeDir, v, vex::voltageUnits::volt);
-    vex::wait(10, vex::msec);
-  }
-  intake2Motor.stop(vex::brakeType::coast);
-  intake1Motor.stop(vex::brakeType::coast);
-  intake_thread_running = false;
-  return 0;
-}
-
-int tongueThreadMain() {
-  tongue_thread_running = true;
-  tonguemech.open();
-  while (tongue_thread_should_run.load()) {
-    printf("poopyrunning\n");
-    vex::wait(20, vex::msec);
-  }
-  if (tongue_thread_close_when_stopped.load()) {
-    printf("poopyclose\n");
-    tonguemech.close();
-  }
-  tongue_thread_running = false;
-  return 0;
-}
-}
-
-// ============================================================================
 // CHASSIS CONTROL FUNCTIONS
 // ============================================================================
 
@@ -87,9 +36,8 @@ int tongueThreadMain() {
  * - right_power: Voltage for the right side (in volts).
  */
 void driveChassis(double left_power, double right_power) {
-  // Spin left and right chassis motors with specified voltages
-  left_chassis.spin(fwd, left_power, voltageUnits::volt);
-  right_chassis.spin(fwd, right_power, voltageUnits::volt);
+  left_chassis.spin(vex::directionType::fwd, left_power * 100, vex::voltageUnits::mV);
+  right_chassis.spin(vex::directionType::fwd, right_power * 100, vex::voltageUnits::mV);
 }
 
 /*
@@ -112,6 +60,20 @@ void resetChassis() {
 }
 
 /*
+ * Normalizes an angle to be within +/-180 degrees of the current heading.
+ * - angle: The target angle to normalize.
+ */
+double normalizeTarget(double angle) {
+  // Adjust angle to be within +/-180 degrees of the inertial sensor's rotation
+  if (angle - getInertialHeading() > 180) {
+    while (angle - getInertialHeading() > 180) angle -= 360;
+  } else if (angle - getInertialHeading() < -180) {
+    while (angle - getInertialHeading() < -180) angle += 360;
+  }
+  return angle;
+}
+
+/*
  * Returns the current rotation of the left chassis motor in degrees.
  */
 double getLeftRotationDegree() {
@@ -125,92 +87,6 @@ double getLeftRotationDegree() {
 double getRightRotationDegree() {
   // Get right chassis motor position in degrees
   return right_chassis.position(degrees);
-}
-
-void startIntakeThread(double voltage, bool reverse) {
-  double clamped = clampIntakeVoltage(fabs(voltage));
-  intake_thread_voltage = clamped;
-  intake_thread_reverse = reverse;
-  if (intake_thread_should_run.load()) {
-    return;
-  }
-  intake_thread_should_run = true;
-  intake_thread_handle = new vex::thread(intakeThreadMain);
-  while (!intake_thread_running.load()) {
-    vex::wait(5, vex::msec);
-  }
-}
-
-void stopIntakeThread(vex::brakeType stopType) {
-  if (!intake_thread_should_run.load() && intake_thread_handle == nullptr) {
-    intake2Motor.stop(stopType);
-    intake1Motor.stop(stopType);
-    return;
-  }
-  intake_thread_should_run = false;
-  if (intake_thread_handle != nullptr) {
-    intake_thread_handle->join();
-    delete intake_thread_handle;
-    intake_thread_handle = nullptr;
-  }
-  intake2Motor.stop(stopType);
-  intake1Motor.stop(stopType);
-}
-
-bool isIntakeThreadRunning() {
-  return intake_thread_running.load();
-}
-
-void startTongueThread(bool closeWhenStopped) {
-  tongue_thread_close_when_stopped = closeWhenStopped;
-  printf("poopy\n");
-  if (tongue_thread_should_run.load()) {
-    printf("poopy1\n");
-    return;
-  }
-  tongue_thread_should_run = true;
-  tongue_thread_handle = new vex::thread(tongueThreadMain);
-  while (!tongue_thread_running.load()) {
-    vex::wait(5, vex::msec);
-  }
-}
-
-void stopTongueThread() {
-  if (!tongue_thread_should_run.load() && tongue_thread_handle == nullptr) {
-    if (tongue_thread_close_when_stopped.load()) {
-      tonguemech.close();
-    }
-    return;
-  }
-  tongue_thread_should_run = false;
-  if (tongue_thread_handle != nullptr) {
-    printf("poopykill\n");
-    tongue_thread_handle->join();
-    delete tongue_thread_handle;
-    tongue_thread_handle = nullptr;
-  }
-  if (tongue_thread_close_when_stopped.load()) {
-    printf("poopycloseout\n");
-    tonguemech.close();
-  }
-}
-
-bool isTongueThreadRunning() {
-  return tongue_thread_running.load();
-}
-
-/*
- * Normalizes an angle to be within +/-180 degrees of the current heading.
- * - angle: The target angle to normalize.
- */
-double normalizeTarget(double angle) {
-  // Adjust angle to be within +/-180 degrees of the inertial sensor's rotation
-  if (angle - getInertialHeading() > 180) {
-    while (angle - getInertialHeading() > 180) angle -= 360;
-  } else if (angle - getInertialHeading() < -180) {
-    while (angle - getInertialHeading() < -180) angle += 360;
-  }
-  return angle;
 }
 
 /*
@@ -424,8 +300,8 @@ void correctPoseFromFrontRightDistances(double front_mm, double right_mm,
   double Df = front_mm * mm_to_in;
   double Dr = right_mm * mm_to_in;
 
-  double odom_x = x_pos;
-  double odom_y = y_pos;
+  double odom_x = xpos;
+  double odom_y = ypos;
   double initial_theta = getInertialHeading() * deg_to_rad;
 
   auto implied_pose = [&](double th) {
@@ -469,12 +345,12 @@ void correctPoseFromFrontRightDistances(double front_mm, double right_mm,
   double new_x = std::get<0>(best_pose);
   double new_y = std::get<1>(best_pose);
 
-  x_pos = new_x;
-  y_pos = new_y;
+  xpos = new_x;
+  ypos = new_y;
   correct_angle = fmod((best_theta / deg_to_rad) + 540.0, 360.0) - 180.0;
 
   Brain.Screen.clearLine();
-  Brain.Screen.printAt(10, 20, "Pose corrected: x=%.2f in y=%.2f in th=%.2f deg", x_pos, y_pos, correct_angle);
+  Brain.Screen.printAt(10, 20, "Pose corrected: x=%.2f in y=%.2f in th=%.2f deg", xpos, ypos, correct_angle);
 }
 
 bool autoCorrectFromFrontRightSensors(int samples, double max_apply_shift_in,
@@ -488,19 +364,19 @@ bool autoCorrectFromFrontRightSensors(int samples, double max_apply_shift_in,
   double wall_x_in = std::isnan(wall_x_override) ? reference_wall_x_in : wall_x_override;
   double wall_y_in = std::isnan(wall_y_override) ? reference_wall_y_in : wall_y_override;
 
-  double before_x = x_pos;
-  double before_y = y_pos;
+  double before_x = xpos;
+  double before_y = ypos;
   correctPoseFromFrontRightDistances(front_avg_mm, right_avg_mm,
                                      front_distance_offset_x, front_distance_offset_y,
                                      right_distance_offset_x, right_distance_offset_y,
                                      wall_x_in, wall_y_in);
 
-  double dx = x_pos - before_x;
-  double dy = y_pos - before_y;
+  double dx = xpos - before_x;
+  double dy = ypos - before_y;
   double shift = sqrt(dx*dx + dy*dy);
   if (shift > max_apply_shift_in) {
-    x_pos = before_x;
-    y_pos = before_y;
+    xpos = before_x;
+    ypos = before_y;
     return false;
   }
   return true;
@@ -528,8 +404,8 @@ bool captureReferenceWallsFromSensors(int samples) {
   double rx_wx = c * right_distance_offset_x - s * right_distance_offset_y;
   double fx_wy = s * front_distance_offset_x + c * front_distance_offset_y;
 
-  reference_wall_x_in = x_pos + right_in * c + rx_wx;
-  reference_wall_y_in = y_pos + front_in * c + fx_wy;
+  reference_wall_x_in = xpos + right_in * c + rx_wx;
+  reference_wall_y_in = ypos + front_in * c + fx_wy;
 
   Brain.Screen.printAt(10, 40, "Wall refs: x=%.2f y=%.2f", reference_wall_x_in, reference_wall_y_in);
   return true;
@@ -1123,8 +999,8 @@ void trackNoOdomWheel() {
     double polar_angle_rad = prev_heading_rad + delta_heading_rad / 2.0;
     double polar_radius_in = delta_local_y_in;
 
-    x_pos += polar_radius_in * sin(polar_angle_rad);
-    y_pos += polar_radius_in * cos(polar_angle_rad);
+    xpos += polar_radius_in * sin(polar_angle_rad);
+    ypos += polar_radius_in * cos(polar_angle_rad);
 
     prev_heading_rad = heading_rad;
     prev_left_deg = left_deg;
@@ -1172,8 +1048,8 @@ void trackXYOdomWheel() {
     double polar_radius_in = sqrt(pow(delta_local_x_in, 2) + pow(delta_local_y_in, 2));
     double polar_angle_rad = local_polar_angle_rad - heading_rad - (delta_heading_rad / 2);
 
-    x_pos += polar_radius_in * cos(polar_angle_rad);
-    y_pos += polar_radius_in * sin(polar_angle_rad);
+    xpos += polar_radius_in * cos(polar_angle_rad);
+    ypos += polar_radius_in * sin(polar_angle_rad);
 
     prev_heading_rad = heading_rad;
     prev_horizontal_pos_deg = horizontal_pos_deg;
@@ -1225,8 +1101,8 @@ void trackXOdomWheel() {
     double polar_radius_in = sqrt(pow(delta_local_x_in, 2) + pow(delta_local_y_in, 2));
     double polar_angle_rad = local_polar_angle_rad - heading_rad - (delta_heading_rad / 2);
 
-    x_pos += polar_radius_in * cos(polar_angle_rad);
-    y_pos += polar_radius_in * sin(polar_angle_rad);
+    xpos += polar_radius_in * cos(polar_angle_rad);
+    ypos += polar_radius_in * sin(polar_angle_rad);
     
     prev_heading_rad = heading_rad;
     prev_horizontal_pos_deg = horizontal_pos_deg;
@@ -1264,8 +1140,8 @@ void trackYOdomWheel() {
     double polar_angle_rad = prev_heading_rad + delta_heading_rad / 2.0;
     double polar_radius_in = delta_local_y_in;
 
-    x_pos += polar_radius_in * cos(polar_angle_rad);
-    y_pos += polar_radius_in * sin(polar_angle_rad);
+    xpos += polar_radius_in * cos(polar_angle_rad);
+    ypos += polar_radius_in * sin(polar_angle_rad);
 
     prev_heading_rad = heading_rad;
     prev_vertical_pos_deg = vertical_pos_deg;
@@ -1289,7 +1165,7 @@ void turnToPoint(double x, double y, int direction, double time_limit_msec) {
     add = 180; // Add 180 degrees if turning to face backward
   }
   // Calculate target angle using atan2 and normalize
-  double turn_angle = normalizeTarget(radToDeg(atan2(x - x_pos, y - y_pos))) + add;
+  double turn_angle = normalizeTarget(radToDeg(atan2(x - xpos, y - ypos))) + add;
   PID pid = PID(turn_kp, turn_ki, turn_kd);
 
   pid.setTarget(turn_angle); // Set PID target
@@ -1316,7 +1192,7 @@ void turnToPoint(double x, double y, int direction, double time_limit_msec) {
   int index = 1;
   while (!pid.targetArrived() && Brain.timer(msec) - start_time <= time_limit_msec) {
     // Continuously update target as robot moves
-    pid.setTarget(normalizeTarget(radToDeg(atan2(x - x_pos, y - y_pos))) + add);
+    pid.setTarget(normalizeTarget(radToDeg(atan2(x - xpos, y - ypos))) + add);
     current_heading = getInertialHeading();
     output = pid.update(current_heading);
 
@@ -1375,14 +1251,14 @@ void moveToPoint(double x, double y, int dir, double time_limit_msec, bool exit,
   PID pid_heading = PID(heading_correction_kp, heading_correction_ki, heading_correction_kd);
 
   // Set PID targets for distance and heading
-  pid_distance.setTarget(hypot(x - x_pos, y - y_pos));
+  pid_distance.setTarget(hypot(x - xpos, y - ypos));
   pid_distance.setIntegralMax(0);  
   pid_distance.setIntegralRange(3);
   pid_distance.setSmallBigErrorTolerance(threshold, threshold * 3);
   pid_distance.setSmallBigErrorDuration(50, 250);
   pid_distance.setDerivativeTolerance(5);
   
-  pid_heading.setTarget(normalizeTarget(radToDeg(atan2(x - x_pos, y - y_pos)) + add));
+  pid_heading.setTarget(normalizeTarget(radToDeg(atan2(x - xpos, y - ypos)) + add));
   pid_heading.setIntegralMax(0);  
   pid_heading.setIntegralRange(1);
   
@@ -1403,21 +1279,21 @@ void moveToPoint(double x, double y, int dir, double time_limit_msec, bool exit,
   // Main PID loop for moving to point
   while (Brain.timer(msec) - start_time <= time_limit_msec) {
     // Continuously update targets as robot moves
-    pid_heading.setTarget(normalizeTarget(radToDeg(atan2(x - x_pos, y - y_pos)) + add));
-    pid_distance.setTarget(hypot(x - x_pos, y - y_pos));
+    pid_heading.setTarget(normalizeTarget(radToDeg(atan2(x - xpos, y - ypos)) + add));
+    pid_distance.setTarget(hypot(x - xpos, y - ypos));
     current_angle = getInertialHeading();
     // Calculate drive output based on heading and distance
-    left_output = pid_distance.update(0) * cos(degToRad(atan2(x - x_pos, y - y_pos) * 180 / M_PI + add - current_angle)) * dir;
+    left_output = pid_distance.update(0) * cos(degToRad(atan2(x - xpos, y - ypos) * 180 / M_PI + add - current_angle)) * dir;
     right_output = left_output;
     // Check if robot has crossed the perpendicular line to the target
-    perpendicular_line = ((y_pos - y) * -cos(degToRad(normalizeTarget(current_angle + add))) <= (x_pos - x) * sin(degToRad(normalizeTarget(current_angle + add))) + exittolerance);
+    perpendicular_line = ((ypos - y) * -cos(degToRad(normalizeTarget(current_angle + add))) <= (xpos - x) * sin(degToRad(normalizeTarget(current_angle + add))) + exittolerance);
     if(perpendicular_line && !prev_perpendicular_line) {
       break;
     }
     prev_perpendicular_line = perpendicular_line;
 
     // Only apply heading correction if far from target
-    if(hypot(x - x_pos, y - y_pos) > 8 && ch == true) {
+    if(hypot(x - xpos, y - ypos) > 8 && ch == true) {
       correction_output = pid_heading.update(current_angle);
     } else {
       correction_output = 0;
@@ -1615,7 +1491,7 @@ void boomerang(double x, double y, int dir, double a, double dlead, double time_
   pid_distance.setSmallBigErrorDuration(50, 250);
   pid_distance.setDerivativeTolerance(5);
 
-  pid_heading.setTarget(normalizeTarget(radToDeg(atan2(x - x_pos, y - y_pos))));
+  pid_heading.setTarget(normalizeTarget(radToDeg(atan2(x - xpos, y - ypos))));
   pid_heading.setIntegralMax(0);  
   pid_heading.setIntegralRange(1);
   pid_heading.setSmallBigErrorTolerance(0, 0);
@@ -1631,17 +1507,17 @@ void boomerang(double x, double y, int dir, double a, double dlead, double time_
 
   // Main PID loop for boomerang path
   while ((!pid_distance.targetArrived()) && Brain.timer(msec) - start_time <= time_limit_msec) {
-    hypotenuse = hypot(x_pos - x, y_pos - y); // Distance to target
+    hypotenuse = hypot(xpos - x, ypos - y); // Distance to target
     // Calculate carrot point for path leading
     carrot_x = x - hypotenuse * sin(degToRad(a + add)) * dlead;
     carrot_y = y - hypotenuse * cos(degToRad(a + add)) * dlead;
-    pid_distance.setTarget(hypot(carrot_x - x_pos, carrot_y - y_pos) * dir);
+    pid_distance.setTarget(hypot(carrot_x - xpos, carrot_y - ypos) * dir);
     current_angle = getInertialHeading();
     // Calculate drive output based on carrot point
-    left_output = pid_distance.update(0) * cos(degToRad(atan2(carrot_x - x_pos, carrot_y - y_pos) * 180 / M_PI + add - current_angle));
+    left_output = pid_distance.update(0) * cos(degToRad(atan2(carrot_x - xpos, carrot_y - ypos) * 180 / M_PI + add - current_angle));
     right_output = left_output;
     // Check if robot has crossed the perpendicular line to the target
-    perpendicular_line = ((y_pos - y) * -cos(degToRad(normalizeTarget(a))) <= (x_pos - x) * sin(degToRad(normalizeTarget(a))) + exit_tolerance);
+    perpendicular_line = ((ypos - y) * -cos(degToRad(normalizeTarget(a))) <= (xpos - x) * sin(degToRad(normalizeTarget(a))) + exit_tolerance);
     if(perpendicular_line && !prev_perpendicular_line) {
       break;
     }
@@ -1653,22 +1529,22 @@ void boomerang(double x, double y, int dir, double a, double dlead, double time_
     }
 
     // Heading correction logic based on distance to carrot/target
-    if(hypot(carrot_x - x_pos, carrot_y - y_pos) > 8) {
-      pid_heading.setTarget(normalizeTarget(radToDeg(atan2(carrot_x - x_pos, carrot_y - y_pos)) + add));
+    if(hypot(carrot_x - xpos, carrot_y - ypos) > 8) {
+      pid_heading.setTarget(normalizeTarget(radToDeg(atan2(carrot_x - xpos, carrot_y - ypos)) + add));
       correction_output = pid_heading.update(current_angle);
-    } else if(hypot(x - x_pos, y - y_pos) > 6) {
-      pid_heading.setTarget(normalizeTarget(radToDeg(atan2(x - x_pos, y - y_pos)) + add));
+    } else if(hypot(x - xpos, y - ypos) > 6) {
+      pid_heading.setTarget(normalizeTarget(radToDeg(atan2(x - xpos, y - ypos)) + add));
       correction_output = pid_heading.update(current_angle);
     } else {
       pid_heading.setTarget(normalizeTarget(a));
       correction_output = pid_heading.update(current_angle);
-      if(exit && hypot(x - x_pos, y - y_pos) < 5) {
+      if(exit && hypot(x - xpos, y - ypos) < 5) {
         break;
       }
     }
 
     // Limit slip speed for smoother curves
-    slip_speed = sqrt(chase_power * getRadius(x_pos, y_pos, carrot_x, carrot_y, current_angle) * 9.8);
+    slip_speed = sqrt(chase_power * getRadius(xpos, ypos, carrot_x, carrot_y, current_angle) * 9.8);
     if(left_output > slip_speed) {
       left_output = slip_speed;
     } else if(left_output < -slip_speed) {

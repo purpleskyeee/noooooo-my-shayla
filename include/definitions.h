@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <deque>
 #include <string>
-
 #include "port_config.h"
 
 using namespace vex;
@@ -24,38 +23,22 @@ extern motor right_chassis2;
 extern motor right_chassis3;
 extern motor_group right_chassis;
 extern inertial inertial_sensor;
-extern optical example_optical_sensor;
-extern distance example_distance_sensor;
-extern digital_out example_piston;
-extern rotation horizontal_tracker;
-extern rotation vertical_tracker;
+
 extern motor intake1Motor;
 extern motor intake2Motor;
+extern motor intake3Motor;
 extern pneumatics tonguemech;
-extern pneumatics rubberband;
 extern pneumatics flap;
 extern pneumatics sidedescore;
-extern pneumatics pto;
 
-extern motor arm_motor1;
-extern motor arm_motor2;
-extern motor_group arm_motor;
-extern motor intake_motor;
-extern motor &intake_primary_motor;
-extern motor &intake_stage1_motor;
-extern motor &intake_stage2_motor;
-extern digital_out claw;
-extern digital_out rush_arm;
 extern optical optical_sensor;
 extern distance intake_distance;
 extern distance clamp_distance;
-extern distance storage_distance_sensor;
-extern distance middle_goal_scoring_sensor;
-extern distance long_goal_scoring_sensor;
-extern distance &top_distance_sensor;
-extern distance &front_distance;
-extern distance &right_distance;
-extern digital_out mogo_mech;
+
+extern distance front_distance;
+extern distance right_distance;
+extern encoder horizontal_tracker;
+extern encoder vertical_tracker;
 
 // Sensor geometry and correction parameters
 extern double front_distance_offset_x;
@@ -89,27 +72,23 @@ extern double max_slew_decel_fwd;
 extern double max_slew_accel_rev;
 extern double max_slew_decel_rev;
 extern double chase_power;
+extern const double MAX_VEL;
 
 // Driver-control shared state (used by the refactored threads)
 extern double axis3;
 extern double axis1;
 extern double Right_Power;
 extern double Left_Power;
-extern bool tonguemechdown;
-extern bool rubberbandon;
-extern bool flapdown;
-extern bool descoreup;
-extern int defensechange;
-extern bool intake_collect;
-extern bool intake_in;
-extern bool intake_outtake;
-extern bool flapdown;
-extern bool ptoengaged;
-extern bool LastL1;
-extern bool driveEngaged;
-extern bool intakeEngaged;
+extern bool TongueState;
+extern bool DescoreState;
+extern int DefenseMode;
 
-extern std::atomic<bool> driver_control_active;
+extern double MidGoalScoring;
+extern double LongGoalScoring;
+extern double IntakeCollecting;
+extern double IntakeOuttaking;
+
+extern double AutonState;
 
 // Lifecycle hooks
 void vexcodeInit(void);

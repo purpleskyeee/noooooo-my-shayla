@@ -10,7 +10,6 @@
 #include "vex.h"
 #include "port_config.h"
 #include "definitions.h"
-#include "auton_functions.h"
 #include "auton_task.h"
 #include "threads.h"
 #include "pid.h"
@@ -51,26 +50,38 @@ void pre_auton(void) {
 /*-------------------------------
 --------------------------------------------*/
 
-void autonomous(void) {
-  ptoengaged = false;
-  tonguemechdown = false;
-  driveTo(33, 2000, true, 12, 0, true);
-  turnToAngle(-45, 2000, true, 12);
-  driveTo(1, 500, true, 8, 0, true);
-  intake_outtake = true;
-  wait(2500, msec);
-  intake_outtake = false;
-  driveTo(4, 500, true, 8, 0, true);
-  driveTo(-46, 2000, true, 12, 0, true);
-  turnToAngle(-180, 2000, true, 12);
-  tonguemechdown = true;
-  wait(500, msec);
-  intake_collect = true;
-  driveTo(24, 2000, true, 12,0, true);
-  intake_collect = false;
-  driveTo(-40, 2000, true, 12, 0, true);
-  intake_in = true;
+
+// void autonomous(void) {
+//   tonguemech.set(true);
+//   driveTo(-33, 2000, true, 12, 0, true);
+//   turnToAngle(-45, 2000, true, 12);
+//   driveTo(-1, 500, true, 8, 0, true);
+//   intake_outtake(12.0);
+//   wait(2500, msec);
+//   intake_outtake(0);
+//   driveTo(-4, 500, true, 8, 0, true);
+//   driveTo(46, 2000, true, 12, 0, true);
+//   turnToAngle(-180, 2000, true, 12);
+//   tonguemechdown = true;
+//   wait(500, msec);
+//   intake_collect(12.0);
+//   driveTo(-24, 2000, true, 12, 0, true);
+//   intake_collect(0);
+//   driveTo(40, 2000, true, 12, 0, true);
+//   intake_score(12.0);
+//   wait(2000, msec);
+//   intake_score(0);
+// }
+
+void autonomous(void) 
+{
+  tonguemech.set(true);
+  wait(1,sec);
+  driveChassis(12.0, 12.0);
+  wait(100,msec);
+  driveChassis(0,0);
 }
+
 /*---------------------------------------------------------------------------*/
 /*                                                                           */
 /*                              User Control Task                            */
@@ -89,14 +100,15 @@ void usercontrol(void) {
 // Main will set up the competition functions and callbacks.
 //
 int main() {
-  // Competition.autonomous(autonomous);
-  // Competition.drivercontrol(usercontrol);
-
+  Competition.autonomous(autonomous);
+  Competition.drivercontrol(usercontrol);
+ // true is retract
+  sidedescore.set(true);
   pre_auton();
 
   //autonomous();
 
-  DriverControl();
+  // DriverControl();
 
 
   while (true) {

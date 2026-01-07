@@ -75,10 +75,3 @@ bool correctHeadingFromSensors(int samples = 5, double max_apply_shift_in = -1.0
 					double align_time_msec = 800, double align_max_output = 12.0,
 					double desired_heading_deg = NAN,
 					double wall_x_in = NAN, double wall_y_in = NAN);
-
-void startIntakeThread(double voltage, bool reverse);
-void stopIntakeThread(vex::brakeType stopType = vex::brakeType::coast);
-bool isIntakeThreadRunning();
-void startTongueThread(bool closeWhenStopped = false);
-void stopTongueThread();
-bool isTongueThreadRunning();

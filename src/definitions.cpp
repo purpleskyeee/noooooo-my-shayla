@@ -1,60 +1,40 @@
 #include "vex.h"
 
-#include <atomic>
-
 using namespace vex;
 using signature = vision::signature;
 using code = vision::code;
 
-// A global instance of brain used for printing to the V5 Brain screen
 brain Brain;
 
-// VEXcode device constructors
 controller controller_1 = controller(primary);
 
-motor left_chassis1 = motor(LEFT_CHASSIS1_PORT, ratio6_1, false);
-motor left_chassis2 = motor(LEFT_CHASSIS2_PORT, ratio6_1, false);
-motor left_chassis3 = motor(LEFT_CHASSIS3_PORT, ratio6_1, false);
+motor left_chassis1 = motor(LEFT_CHASSIS1_PORT, ratio6_1, true);
+motor left_chassis2 = motor(LEFT_CHASSIS2_PORT, ratio6_1, true);
+motor left_chassis3 = motor(LEFT_CHASSIS3_PORT, ratio6_1, true);
 motor_group left_chassis = motor_group(left_chassis1, left_chassis2, left_chassis3);
-motor right_chassis1 = motor(RIGHT_CHASSIS1_PORT, ratio6_1, true);
-motor right_chassis2 = motor(RIGHT_CHASSIS2_PORT, ratio6_1, true);
-motor right_chassis3 = motor(RIGHT_CHASSIS3_PORT, ratio6_1, true);
+motor right_chassis1 = motor(RIGHT_CHASSIS1_PORT, ratio6_1, false);
+motor right_chassis2 = motor(RIGHT_CHASSIS2_PORT, ratio6_1, false);
+motor right_chassis3 = motor(RIGHT_CHASSIS3_PORT, ratio6_1, false);
 motor_group right_chassis = motor_group(right_chassis1, right_chassis2, right_chassis3);
 
 inertial inertial_sensor = inertial(INERTIAL_SENSOR_PORT);
-optical example_optical_sensor = optical(OPTICAL_SENSOR_PORT);
-distance example_distance_sensor = distance(DISTANCE_SENSOR_PORT);
-digital_out example_piston = digital_out(Brain.ThreeWirePort.A);
+
 motor intake1Motor = motor(INTAKE1_MOTOR_PORT, ratio6_1, false);
 motor intake2Motor = motor(INTAKE2_MOTOR_PORT, ratio6_1, true);
+motor intake3Motor = motor(INTAKE3_MOTOR_PORT, ratio6_1, true);
+
 pneumatics tonguemech = pneumatics(TONGUE_TRI_PORT);
-pneumatics rubberband = pneumatics(RUBBER_BAND_PORT);
 pneumatics flap = pneumatics(FLAP_PORT);
 pneumatics sidedescore = pneumatics(SIDE_DESCORE_PORT);
-pneumatics pto = pneumatics(PTO_TRI_PORT);
 
-rotation horizontal_tracker = rotation(HORIZONTAL_TRACKER_PORT, true);
-rotation vertical_tracker = rotation(VERTICAL_TRACKER_PORT, true);
-
-motor arm_motor1 = motor(ARM_MOTOR1_PORT, ratio18_1, true);
-motor arm_motor2 = motor(ARM_MOTOR2_PORT, ratio18_1, false);
-motor_group arm_motor = motor_group(arm_motor1, arm_motor2);
-motor intake_motor = motor(STAGER_MOTOR_PORT, ratio18_1, true);
-motor &intake_primary_motor = intake_motor;
-motor &intake_stage1_motor = intake_motor;
-motor &intake_stage2_motor = intake_motor;
-digital_out claw = digital_out(CLAW_PORT);
-digital_out rush_arm = digital_out(RUSH_ARM_PORT);
 optical optical_sensor = optical(OPTICAL_SENSOR_PORT);
+
 distance intake_distance = distance(DISTANCE_SENSOR_PORT);
 distance clamp_distance = distance(DISTANCE_SENSOR_PORT);
-distance storage_distance_sensor = distance(DISTANCE_SENSOR_PORT);
-distance middle_goal_scoring_sensor = distance(DISTANCE_SENSOR_PORT);
-distance long_goal_scoring_sensor = distance(DISTANCE_SENSOR_PORT);
-distance &top_distance_sensor = long_goal_scoring_sensor;
-distance &front_distance = intake_distance;
-distance &right_distance = clamp_distance;
-digital_out mogo_mech = digital_out(MOGO_MECH_PORT);
+distance front_distance = distance(DISTANCE_SENSOR_PORT);
+distance right_distance = distance(DISTANCE_SENSOR_PORT);
+encoder vertical_tracker = encoder(VERTICAL_TRACKER_PORT);
+encoder horizontal_tracker = encoder(HORIZONTAL_TRACKER_PORT);
 
 // Default geometry constants for correctAndAlign helpers (update to match robot)
 double front_distance_offset_x = 0.0;
@@ -88,29 +68,22 @@ double max_slew_decel_fwd = 24;
 double max_slew_accel_rev = 24;
 double max_slew_decel_rev = 24;
 double chase_power = 2;
+const double MAX_VEL = 12800.0;
 
 // Driver-control shared state defaults
 double axis3 = 0;
 double axis1 = 0;
 double Right_Power = 0;
 double Left_Power = 0;
-bool tonguemechdown = false;
-bool rubberbandon = false;
-bool descoreup = false;
-int defensechange = 1;
-bool intake_collect = false;
-bool intake_in = false;
-bool intake_outtake = false;
-bool flapdown = true;
-bool ptoengaged = false;
-bool driveEngaged = false;
-bool intakeEngaged = true;
+bool TongueState = false;
+bool DescoreState = true;
+int DefenseMode = 1;
 
-std::atomic<bool> driver_control_active{false};
+double MidGoalScoring = false;
+double LongGoalScoring = false;
+double IntakeCollecting = false;
+double IntakeOuttaking = false;
 
-// VEXcode generated functions
-bool RemoteControlCodeEnabled = true;
+double AutonState = false; //has auton finished
 
-void vexcodeInit(void) {
-  // nothing to initialize
-}
+void vexcodeInit(void) {}
